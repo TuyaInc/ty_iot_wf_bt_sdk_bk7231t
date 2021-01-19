@@ -13,23 +13,39 @@ USER_SW_VER=`echo $APP_VERSION | cut -d'-' -f1`
 
 echo "Start Compile"
 set -e
+
+SYSTEM=`uname -s`
+echo "system:"$SYSTEM
+if [ $SYSTEM = "Linux" ]; then
+	TOOL_DIR=package_tool/linux
+	OTAFIX=${TOOL_DIR}/otafix
+	ENCRYPT=${TOOL_DIR}/encrypt
+	BEKEN_PACK=${TOOL_DIR}/beken_packager
+	RT_OTA_PACK_TOOL=${TOOL_DIR}/rt_ota_packaging_tool_cli
+	TY_PACKAGE=${TOOL_DIR}/package
+else
+	TOOL_DIR=package_tool/windows
+	OTAFIX=${TOOL_DIR}/otafix.exe
+	ENCRYPT=${TOOL_DIR}/encrypt.exe
+	BEKEN_PACK=${TOOL_DIR}/beken_packager.exe
+	RT_OTA_PACK_TOOL=${TOOL_DIR}/rt_ota_packaging_tool_cli.exe
+	TY_PACKAGE=${TOOL_DIR}/package.exe
+fi
+
 APP_PATH=../../../apps
 
 for i in `find ${APP_PATH}/$APP_BIN_NAME/src -type d`
 do
-#    echo $i
     rm -rf $i/*.o
 done
 
 for i in `find ../tuya_common/src -type d`
 do
-#    echo $i
     rm -rf $i/*.o
 done
 
 for i in `find ../../../components -type d`
 do
-#    echo $i
     rm -rf $i/*.o
 done
 
@@ -39,18 +55,17 @@ else
 	make APP_BIN_NAME=$APP_BIN_NAME USER_SW_VER=$USER_SW_VER APP_VERSION=$APP_VERSION clean -C ./
 fi
 
-make APP_BIN_NAME=$APP_BIN_NAME USER_SW_VER=$USER_SW_VER APP_VERSION=$APP_VERSION $USER_CMD -C ./
+make APP_BIN_NAME=$APP_BIN_NAME USER_SW_VER=$USER_SW_VER APP_VERSION=$APP_VERSION $USER_CMD -j -C ./
 
 echo "Start Combined"
 cp ${APP_PATH}/$APP_BIN_NAME/output/$APP_VERSION/${APP_BIN_NAME}_${APP_VERSION}.bin tools/generate/
 
-cd tools/generate/
-./otafix ${APP_BIN_NAME}_${APP_VERSION}.bin &
-./encrypt ${APP_BIN_NAME}_${APP_VERSION}.bin 510fb093 a3cbeadc 5993a17e c7adeb03 10000
+cd tools/generate
+./${OTAFIX} ${APP_BIN_NAME}_${APP_VERSION}.bin
+./${ENCRYPT} ${APP_BIN_NAME}_${APP_VERSION}.bin 510fb093 a3cbeadc 5993a17e c7adeb03 10000
 python mpytools.py ${APP_BIN_NAME}_${APP_VERSION}_enc.bin
 
-./beken_packager config.json
-
+./${BEKEN_PACK} config.json
 
 echo "End Combined"
 cp all_1.00.bin ${APP_BIN_NAME}_QIO_${APP_VERSION}.bin
@@ -61,8 +76,8 @@ rm ${APP_BIN_NAME}_${APP_VERSION}_enc_uart_1.00.bin
 
 #generate ota file
 echo "generate ota file"
-./rt_ota_packaging_tool_cli -f ${APP_BIN_NAME}_${APP_VERSION}.bin -v $CURRENT_TIME -o ${APP_BIN_NAME}_${APP_VERSION}.rbl -p app -c gzip -s aes -k 0123456789ABCDEF0123456789ABCDEF -i 0123456789ABCDEF
-./package.bin ${APP_BIN_NAME}_${APP_VERSION}.rbl ${APP_BIN_NAME}_UG_${APP_VERSION}.bin $APP_VERSION 
+./${RT_OTA_PACK_TOOL} -f ${APP_BIN_NAME}_${APP_VERSION}.bin -v $CURRENT_TIME -o ${APP_BIN_NAME}_${APP_VERSION}.rbl -p app -c gzip -s aes -k 0123456789ABCDEF0123456789ABCDEF -i 0123456789ABCDEF
+./${TY_PACKAGE} ${APP_BIN_NAME}_${APP_VERSION}.rbl ${APP_BIN_NAME}_UG_${APP_VERSION}.bin $APP_VERSION 
 rm ${APP_BIN_NAME}_${APP_VERSION}.rbl
 rm ${APP_BIN_NAME}_${APP_VERSION}.bin
 rm ${APP_BIN_NAME}_${APP_VERSION}.cpr
